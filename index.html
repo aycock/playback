@@ -1,0 +1,229 @@
+<!doctype html>
+
+<!--
+MIT License
+
+Copyright (c) 2018 John Aycock, aycock@ucalgary.ca
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+-->
+
+<head>
+	<title>CPSC 231 Playback</title>
+	<link rel="stylesheet" href="pikaday.css">
+</head>
+
+<body>
+
+<h1>CPSC 231 Playback</h1>
+
+<script src="pikaday.js"></script>
+<script src="term.js"></script>
+
+<div id="calid"></div>
+<p>
+<div id="termid"></div>
+
+<div id="termspeed" style="display:none;">
+<table align="center">
+	<tr>
+	<td><button onclick="changespeed(1000000)">Glacial</button></td>
+	<td><button onclick="changespeed(2500)">Slow</button></td>
+	<td><button onclick="changespeed(1000)">Normal speed</button></td>
+	<td><button onclick="changespeed(100)">Fast</button></td>
+	</tr>
+</table>
+</div>
+
+<script type="text/javascript">
+	var V = {
+		"Wed Jan 18 2017":	'2017-01-18-12h22-xterm-80x24',
+		"Fri Jan 20 2017":	'2017-01-20-12h32-xterm-80x24',
+		"Mon Jan 23 2017":	'2017-01-23-12h24-xterm-80x24',
+		"Wed Jan 25 2017":	'2017-01-25-12h39-xterm-80x24',
+		"Fri Jan 27 2017":	'2017-01-27-12h40-xterm-80x24',
+		"Mon Jan 30 2017":	'2017-01-30-12h32-xterm-80x24',
+		"Wed Feb 01 2017":	'2017-02-01-12h29-xterm-80x24',
+		"Fri Feb 03 2017":	'2017-02-03-12h39-xterm-80x24',
+		"Mon Feb 06 2017":	'2017-02-06-12h24-xterm-80x24',
+		"Wed Feb 08 2017":	'2017-02-08-12h27-xterm-80x24',
+		"Mon Feb 13 2017":	'2017-02-13-12h27-xterm-80x24',
+		"Wed Feb 15 2017":	'2017-02-15-12h29-xterm-80x24',
+		"Mon Feb 27 2017":	'2017-02-27-12h25-xterm-80x24',
+		"Wed Mar 01 2017":	'2017-03-01-12h38-xterm-80x24',
+		"Fri Mar 03 2017":	'2017-03-03-12h45-xterm-80x24',
+		"Mon Mar 06 2017":	'2017-03-06-12h25-xterm-80x24',
+		"Wed Mar 08 2017":	'2017-03-08-12h40-xterm-80x24',
+		"Fri Mar 10 2017":	'2017-03-10-12h34-xterm-80x24',
+		"Mon Mar 13 2017":	'2017-03-13-12h37-xterm-80x24',
+		"Mon Mar 20 2017":	'2017-03-20-12h32-xterm-80x24',
+		"Wed Mar 22 2017":	'2017-03-22-12h35-xterm-80x24',
+		"Mon Mar 27 2017":	'2017-03-27-12h33-xterm-80x24',
+		"Wed Mar 29 2017":	'2017-03-29-12h34-xterm-80x24',
+		"Fri Mar 31 2017":	'2017-03-31-12h40-xterm-80x24',
+		"Mon Apr 03 2017":	'2017-04-03-12h38-xterm-80x24',
+		"Fri Apr 07 2017":	'2017-04-07-12h38-xterm-80x24',
+		"Mon Apr 10 2017":	'2017-04-10-12h45-xterm-80x24',
+	};
+
+	function initpick() {
+		// based on code from https://github.com/dbushell/Pikaday
+		var e = document.getElementById('calid');
+		var picker = new Pikaday({
+			minDate: new Date(2017, 0, 1),
+			maxDate: new Date(2017, 3, 30),
+			yearRange: [2017, 2017],
+
+			disableDayFn: function(date) {
+				if (date.toDateString() in V)
+					return false;
+				return true;
+			},
+
+			onSelect: function(date) {
+				//window.alert(V[date.toDateString()]);
+				if (term != null) {
+					clearTimeout(timerid);
+					term.close();
+				}
+				startterm(date.toDateString(),
+					  V[date.toDateString()]);
+			}
+		});
+		e.parentNode.insertBefore(picker.el, e.nextSibling);
+	}
+	initpick();
+</script>
+
+<script type="text/javascript">
+	// has to be pages.cpsc b/c it breaks with the redirect from www.cpsc
+	URLBASE = "https://pages.cpsc.ucalgary.ca/~aycock/231/playback/";
+	MAXDELAY = 2;
+
+	var timing;
+	var timingindex;
+	var record;
+	var recordindex;
+	var mult;
+
+	// from MSDN's XMLHttpRequest Object page
+        function getXMLHttpRequest() {
+                if (window.XMLHttpRequest) {
+                        return new window.XMLHttpRequest;
+                } else {
+                        try {
+                                return new ActiveXObject("MSXML2.XMLHTTP.3.0");
+                        } catch(ex) {
+                                return null;
+                        }
+                }
+        }
+
+        function loadtrace(name) {
+                var req, data;
+		// timing data...
+                // XXX check for exceptions, check req.readyState, &c.
+                // XXX should change to async? doesn't seem necessary for this
+                req = getXMLHttpRequest();
+                req.open("GET", URLBASE + name + ".tm", false);
+                req.setRequestHeader('Content-Type', 'text/plain');
+                req.send();
+
+                data = req.responseText;
+		timing = data.split("\n");
+		timingindex = 0;
+
+		// script data...
+                req = getXMLHttpRequest();
+                req.open("GET", URLBASE + name + ".script", false);
+                req.setRequestHeader('Content-Type', 'text/plain');
+                req.send();
+
+                record = req.responseText;
+		// timing data doesn't count "Script started on..." header line
+		recordindex = record.indexOf("\n") + 1;
+        }
+
+	var nextn;
+	var term;
+	var timerid;
+
+	function step() {
+		if (timingindex >= timing.length) {
+			term.write('\x1b[31mPlayback complete.\x1b[m\r\n');
+			//window.alert("Playback complete.");
+			return;
+		}
+
+		var line, fields, delay;
+
+		line = timing[timingindex++];
+		fields = line.split(" ");
+		delay = Number(fields[0]);
+		if (delay > MAXDELAY) {
+			delay = MAXDELAY;
+		}
+		nextn = Number(fields[1]);
+
+		timerid = setTimeout(function() {
+			term.write(record.substr(recordindex, nextn));
+			recordindex += nextn;
+			step();
+		}, delay*mult);
+	}
+
+	function changespeed(n) {
+		clearTimeout(timerid);
+		mult = n;
+		term.write(record.substr(recordindex, nextn));
+		recordindex += nextn;
+		// refocus or terminal cursor disappears when speed buttons used
+		term.focus();
+		step();
+	}
+
+	function startterm(label, basename) {
+		// based on term invocation code from term.js
+		// Copyright (c) 2012-2013, Christopher Jeffrey (MIT License)
+		term = new Terminal({
+			cols: 80,
+			rows: 24,
+			useStyle: true,
+			screenKeys: true,
+			cursorBlink: false
+		});
+
+		//term.on('title', function(title) {
+		//	document.title = title;
+		//});
+		document.title = label + ' CPSC 231 playback';
+
+		//term.open(document.body);
+		term.open(document.getElementById('termid'));
+
+		term.write('\x1b[31mNow playing: ' + label + '...\x1b[m\r\n');
+
+		document.getElementById("termspeed").style.display = "block";
+		loadtrace(basename);
+		mult = 1000;
+		step();
+	}
+</script>
+<body>
+</html>
