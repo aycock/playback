@@ -3,7 +3,7 @@
 <!--
 MIT License
 
-Copyright (c) 2018 John Aycock, aycock@ucalgary.ca
+Copyright (c) 2018-2020 John Aycock, aycock@ucalgary.ca
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -88,7 +88,7 @@ SOFTWARE.
 		var picker = new Pikaday({
 			minDate: new Date(2017, 0, 1),
 			maxDate: new Date(2017, 3, 30),
-			yearRange: [2017, 2017],
+			yearRange: [2020, 2020],
 
 			disableDayFn: function(date) {
 				if (date.toDateString() in V)
@@ -102,8 +102,13 @@ SOFTWARE.
 					clearTimeout(timerid);
 					term.close();
 				}
+				// extract cols and rows from the filename
+				var cr = V[date.toDateString()].split('-');
+				cr = cr.pop().split('x');
+				
 				startterm(date.toDateString(),
-					  V[date.toDateString()]);
+					  V[date.toDateString()],
+					  parseInt(cr[0]), parseInt(cr[1]));
 			}
 		});
 		e.parentNode.insertBefore(picker.el, e.nextSibling);
@@ -198,12 +203,12 @@ SOFTWARE.
 		step();
 	}
 
-	function startterm(label, basename) {
+	function startterm(label, basename, c, r) {
 		// based on term invocation code from term.js
 		// Copyright (c) 2012-2013, Christopher Jeffrey (MIT License)
 		term = new Terminal({
-			cols: 80,
-			rows: 24,
+			cols: c,
+			rows: r,
 			useStyle: true,
 			screenKeys: true,
 			cursorBlink: false
